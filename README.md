@@ -7,32 +7,38 @@ gradient, a stats summary, and a one-click **GPX export** for your bike computer
 
 - **Backend:** FastAPI, single `POST /plan` endpoint returning GeoJSON + stats.
 - **Frontend:** plain `index.html` (no framework) with Leaflet.js.
-- **Routing:** GraphHopper Directions API with a custom model that penalises
-  motorway/primary/secondary roads and non-paved surfaces.
+- **Routing:** GraphHopper Directions API using built-in **bike profiles**.
+  `racingbike` prefers paved/asphalt roads, avoids motorways and busy roads, and
+  is climb-averse — so it natively does most of what we want for a road bike.
 - **Elevation:** Open-Elevation public API (with GraphHopper elevation as a
   fallback) to compute per-segment gradients.
 - **Re-routing:** if more than 10% of the route is steeper than your limit, the
-  app automatically re-routes once with a slope penalty to flatten the climb.
+  app switches to the climb-averse `racingbike` profile to flatten the path.
 
 ---
 
 ## How it works
 
 1. Start/end place names are geocoded with **Nominatim** (OpenStreetMap).
-2. **GraphHopper** returns a `bike` route. Your traffic and surface choices are
-   translated into a GraphHopper *custom model* (the JSON equivalent of the
-   "weighting YAML" idea): busy road classes and unpaved surfaces get lower
-   priority so the router avoids them.
+2. **GraphHopper** returns a route using a built-in bike profile. Your surface
+   and traffic choices select the profile: road-bike preferences (asphalt/paved,
+   or low/medium traffic) use **`racingbike`** (paved, quiet, climb-averse);
+   only "any surface + high traffic" loosens to the general **`bike`** profile.
 3. The route is resampled into evenly spaced points and elevations are fetched
    from **Open-Elevation**. Per-segment gradients are computed and each segment
-   is coloured: green ≤ 3%, orange 3–7%, red > 7%.
-4. If too much of the route is too steep, a second request adds a slope penalty
-   (`average_slope`) so GraphHopper prefers flatter roads.
+   is coloured: green ≤ 3%, orange 3–7%, red > 7%. Surface details from
+   GraphHopper give the % paved figure.
+4. If too much of the route is too steep, the app re-routes with `racingbike`,
+   which avoids steep climbs, and keeps whichever route is flatter.
 
-> **Note on "re-route via waypoints":** rather than guessing blind intermediate
-> waypoints (which rarely flattens a route and burns extra API credits), the
-> re-route uses GraphHopper's slope-aware custom model. It's more reliable and
-> directly targets the steep segments. Easy to swap if you prefer waypoints.
+> **Why profiles instead of a custom weighting model?** GraphHopper's **free
+> tier only supports pre-built profiles** — "flexible mode" (custom models with
+> `ch.disable`) is a paid feature and returns *"Free packages cannot use flexible
+> mode."* The good news is the built-in `racingbike` profile is already tuned to
+> prefer smooth paved roads, avoid motorways/busy roads, and penalise steep
+> gradients, so it covers the traffic/surface/climb goals without a custom model.
+> If you upgrade to a paid key, you can reintroduce a custom model for finer
+> control over individual road classes and a slope penalty.
 
 ---
 
@@ -152,8 +158,9 @@ elevation gain, % paved, average gradient, steepest gradient, ride time at
 
 - **"GRAPHHOPPER_API_KEY is not set"** — add it to `.env` (local) or Railway
   Variables (deployed).
-- **GraphHopper "custom model" error** — some keys/tiers restrict flexible
-  routing; the app automatically retries with the plain bike profile.
+- **"Free packages cannot use flexible mode"** — this app uses only built-in
+  profiles, so a stock free key works. If you see it, you're on an older build
+  that sent a custom model; pull the latest `main.py`.
 - **Flat / missing elevation** — the public Open-Elevation API is occasionally
   down or rate-limited; the app falls back to GraphHopper's elevation data.
 - **Geocoding fails** — make the place name more specific (add the country).

@@ -153,77 +153,50 @@ async def geocode(client: httpx.AsyncClient, place: str) -> Tuple[float, float, 
     return float(top["lat"]), float(top["lon"]), top.get("display_name", place)
 
 
-def build_custom_model(
-    traffic: str, surface: str, max_gradient: float, avoid_slope: bool
-) -> dict:
+def choose_profile(traffic: str, surface: str) -> str:
     """
-    Translate the user's preferences into a GraphHopper custom model.
-    `priority` multipliers in [0, 1] make matching edges less attractive
-    (0 = effectively avoided). This is the JSON equivalent of the
-    'penalise traffic + non-paved surfaces' weighting described in the spec.
+    Pick a built-in GraphHopper profile.
+
+    GraphHopper's FREE tier only supports pre-built (CH) profiles — "flexible
+    mode" (ch.disable + custom_model) is a paid feature. Luckily the built-in
+    profiles already encode most of what we want for a road bike:
+
+      * `racingbike` — strongly prefers smooth/paved roads, avoids motorways and
+        busy/rough roads, and is climb-averse (penalises steep gradients).
+      * `bike` — general cycling, more permissive about surface and roads.
+
+    So the surface/traffic preferences select/bias the profile instead of
+    feeding a custom weighting model:
+      - Road-bike defaults (asphalt/paved, or low/medium traffic) -> racingbike.
+      - Only loosen to `bike` when the user explicitly wants ANY surface AND
+        tolerates HIGH traffic.
     """
-    # How hard to avoid busy roads, by preferred traffic level.
-    traffic_scale = {"low": 1.0, "medium": 0.5, "high": 0.15}.get(traffic, 1.0)
-
-    def pen(base: float) -> float:
-        # base is "how much to keep" at full avoidance; relax it as tolerance rises
-        return round(base + (1.0 - base) * (1.0 - traffic_scale), 3)
-
-    priority = [
-        {"if": "road_class == MOTORWAY", "multiply_by": 0.0},
-        {"if": "road_class == TRUNK", "multiply_by": pen(0.05)},
-        {"if": "road_class == PRIMARY", "multiply_by": pen(0.2)},
-        {"if": "road_class == SECONDARY", "multiply_by": pen(0.45)},
-    ]
-
-    # Surface preferences.
-    if surface == "asphalt":
-        priority.append(
-            {"if": "surface != ASPHALT && surface != CONCRETE", "multiply_by": 0.15}
-        )
-    elif surface == "paved":
-        # Penalise clearly unpaved surfaces; allow the paved family.
-        unpaved = (
-            "surface == GRAVEL || surface == FINE_GRAVEL || surface == DIRT || "
-            "surface == EARTH || surface == GROUND || surface == SAND || "
-            "surface == GRASS || surface == COMPACTED || surface == UNPAVED"
-        )
-        priority.append({"if": unpaved, "multiply_by": 0.1})
-    # "any" => no surface penalty.
-
-    model: dict = {"priority": priority}
-
-    if avoid_slope:
-        # average_slope / max_slope are available because elevation=true.
-        # Strongly discourage edges steeper than the user's limit (up or down).
-        model["priority"].append(
-            {"if": f"average_slope > {max_gradient}", "multiply_by": 0.05}
-        )
-        model["priority"].append(
-            {"if": f"average_slope < {-max_gradient}", "multiply_by": 0.2}
-        )
-
-    return model
+    if surface == "any" and traffic == "high":
+        return "bike"
+    return "racingbike"
 
 
 async def graphhopper_route(
     client: httpx.AsyncClient,
     points: List[Tuple[float, float]],
-    custom_model: Optional[dict],
+    profile: str,
+    with_details: bool = True,
 ) -> dict:
-    """Request a bike route. `points` is a list of (lat, lon)."""
+    """
+    Request a route using a built-in profile (free-tier compatible — no custom
+    model, no ch.disable). `points` is a list of (lat, lon). Includes graceful
+    retries if a key rejects path details or an unknown profile.
+    """
     body: dict = {
-        "profile": "bike",
+        "profile": profile,
         "points": [[lon, lat] for (lat, lon) in points],
         "points_encoded": False,
         "elevation": True,
         "instructions": False,
-        "details": ["road_class", "surface"],
         "locale": "en",
     }
-    if custom_model is not None:
-        body["ch.disable"] = True
-        body["custom_model"] = custom_model
+    if with_details:
+        body["details"] = ["road_class", "surface"]
 
     r = await client.post(
         GRAPHHOPPER_URL,
@@ -232,12 +205,17 @@ async def graphhopper_route(
         timeout=40,
     )
     if r.status_code != 200:
-        # Surface GraphHopper's own message; the caller may retry without
-        # the custom model if the key's tier rejects flexible routing.
         try:
             msg = r.json().get("message", r.text)
         except Exception:
             msg = r.text
+        low = (msg or "").lower()
+        # Some keys don't expose path details on CH -> retry without them.
+        if with_details and "detail" in low:
+            return await graphhopper_route(client, points, profile, with_details=False)
+        # Profile not enabled on this key -> fall back to the generic bike profile.
+        if "profile" in low and profile != "bike":
+            return await graphhopper_route(client, points, "bike", with_details=with_details)
         raise HTTPException(
             status_code=502, detail=f"GraphHopper error ({r.status_code}): {msg}"
         )
@@ -372,19 +350,10 @@ async def route_and_analyze(
     client: httpx.AsyncClient,
     pts: List[Tuple[float, float]],
     req: PlanRequest,
-    avoid_slope: bool,
+    profile: str,
 ) -> Tuple[dict, dict, List[Dict[str, float]]]:
     """Route -> resample -> elevation -> analyze. Returns (path, analysis, track)."""
-    model = build_custom_model(req.traffic, req.surface, req.max_gradient, avoid_slope)
-    try:
-        path = await graphhopper_route(client, pts, model)
-    except HTTPException as e:
-        # Fallback: some free keys reject flexible/custom-model routing. Retry
-        # with the plain bike profile so the app still produces a route.
-        if e.status_code == 502 and "custom" in str(e.detail).lower():
-            path = await graphhopper_route(client, pts, None)
-        else:
-            raise
+    path = await graphhopper_route(client, pts, profile)
 
     coords = path["points"]["coordinates"]
     track = resample_polyline(coords, MAX_TRACK_POINTS)
@@ -425,18 +394,22 @@ async def plan(req: PlanRequest):
         end_lat, end_lon, end_name = await geocode(client, req.end)
         pts = [(start_lat, start_lon), (end_lat, end_lon)]
 
-        # First attempt (traffic + surface penalties only).
-        path, analysis, track = await route_and_analyze(client, pts, req, avoid_slope=False)
+        # First attempt with the profile chosen from the user's preferences.
+        profile = choose_profile(req.traffic, req.surface)
+        path, analysis, track = await route_and_analyze(client, pts, req, profile)
         rerouted = False
 
-        # Re-route once to flatten if too much of the route is too steep.
-        if analysis["steep_frac"] > STEEP_REROUTE_THRESHOLD:
+        # Re-route to flatten if too much of the route is too steep. On the free
+        # tier we can't add a slope penalty, but `racingbike` is climb-averse, so
+        # switching to it is the available "flatten" lever.
+        if analysis["steep_frac"] > STEEP_REROUTE_THRESHOLD and profile != "racingbike":
             try:
                 path2, analysis2, track2 = await route_and_analyze(
-                    client, pts, req, avoid_slope=True
+                    client, pts, req, "racingbike"
                 )
                 if analysis2["steep_frac"] < analysis["steep_frac"]:
                     path, analysis, track = path2, analysis2, track2
+                    profile = "racingbike"
                     rerouted = True
             except HTTPException:
                 pass  # keep the original route if the re-route fails
@@ -446,6 +419,7 @@ async def plan(req: PlanRequest):
     stats = analysis["stats"]
     stats["percent_paved"] = paved
     stats["rerouted"] = rerouted
+    stats["routing_profile"] = profile
 
     return {
         "geojson": analysis["geojson"],
