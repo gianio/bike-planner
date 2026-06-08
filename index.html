@@ -2,180 +2,159 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
 <title>Ridgeline · Road Bike Route Planner</title>
-
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-
 <style>
   :root {
-    --ink:        #0e1512;
-    --ink-2:      #14201b;
-    --panel:      #16231d;
-    --line:       #26382f;
-    --fog:        #8aa298;
-    --paper:      #eef4ef;
-    --amber:      #e8a33d;
-    --amber-deep: #c97f1e;
-    --green:      #2e9e5b;
-    --orange:     #e8862e;
-    --red:        #d83a34;
-    --shadow:     0 18px 50px rgba(0,0,0,.45);
+    --ink:#0e1512; --ink-2:#14201b; --panel:#16231d; --line:#26382f; --fog:#8aa298;
+    --paper:#eef4ef; --amber:#e8a33d; --amber-deep:#c97f1e;
+    --green:#2e9e5b; --orange:#e8862e; --red:#d83a34;
   }
-
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
   body {
-    font-family: 'Outfit', system-ui, sans-serif;
-    background: var(--ink);
-    color: var(--paper);
-    display: flex;
-    overflow: hidden;
+    font-family:'Outfit',system-ui,sans-serif; background:var(--ink); color:var(--paper);
+    display:flex; overflow:hidden;
   }
-  ::selection { background: var(--amber); color: #1a1208; }
+  ::selection { background:var(--amber); color:#1a1208; }
 
-  /* ----- Sidebar ----- */
-  .sidebar {
-    width: 380px;
-    min-width: 380px;
-    height: 100vh;
-    background:
-      radial-gradient(120% 60% at -10% 0%, rgba(232,163,61,.07), transparent 60%),
-      var(--ink-2);
-    border-right: 1px solid var(--line);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-  .brand {
-    padding: 26px 26px 18px;
-    border-bottom: 1px solid var(--line);
-    position: relative;
-  }
-  .brand::after {
-    content: "";
-    position: absolute; left: 26px; right: 26px; bottom: -1px; height: 1px;
-    background: linear-gradient(90deg, var(--amber), transparent);
-  }
-  .brand h1 {
-    font-size: 27px; font-weight: 700; letter-spacing: -.5px; margin: 0;
-    display: flex; align-items: center; gap: 11px;
-  }
-  .brand h1 .mark {
-    width: 30px; height: 30px; flex: none;
-    border: 2px solid var(--amber); border-radius: 8px;
-    display: grid; place-items: center;
-    color: var(--amber); font-size: 17px; transform: rotate(-6deg);
-  }
-  .brand p { margin: 8px 0 0; color: var(--fog); font-size: 13px; font-weight: 300; }
-
-  .form { padding: 22px 26px 8px; }
-  .field { margin-bottom: 18px; }
-  label {
-    display: block; font-size: 11.5px; letter-spacing: 1.2px;
-    text-transform: uppercase; color: var(--fog); margin-bottom: 7px; font-weight: 600;
-  }
-  input[type=text], select {
-    width: 100%; padding: 11px 13px; border-radius: 10px;
-    background: var(--ink); color: var(--paper);
-    border: 1px solid var(--line); font-family: inherit; font-size: 14.5px;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  input[type=text]:focus, select:focus {
-    outline: none; border-color: var(--amber);
-    box-shadow: 0 0 0 3px rgba(232,163,61,.15);
-  }
-  select { appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238aa298' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 14px center; }
-
-  .grad-row { display: flex; align-items: baseline; justify-content: space-between; }
-  .grad-val { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 700; font-size: 15px; }
-  input[type=range] {
-    -webkit-appearance: none; width: 100%; height: 6px; margin-top: 12px;
-    border-radius: 6px; background: linear-gradient(90deg, var(--green), var(--orange), var(--red));
-    cursor: pointer;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
-    background: var(--paper); border: 3px solid var(--amber-deep);
-    box-shadow: 0 2px 6px rgba(0,0,0,.4);
-  }
-  input[type=range]::-moz-range-thumb {
-    width: 20px; height: 20px; border-radius: 50%; background: var(--paper);
-    border: 3px solid var(--amber-deep); box-shadow: 0 2px 6px rgba(0,0,0,.4);
-  }
-
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  .btn {
-    width: 100%; padding: 13px; border: none; border-radius: 11px;
-    font-family: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
-    transition: transform .08s, filter .15s; letter-spacing: .2px;
-  }
-  .btn:active { transform: translateY(1px); }
-  .btn-primary { background: linear-gradient(135deg, var(--amber), var(--amber-deep)); color: #1a1208; }
-  .btn-primary:hover { filter: brightness(1.06); }
-  .btn-primary:disabled { opacity: .55; cursor: progress; }
-  .btn-ghost {
-    background: transparent; color: var(--paper); border: 1px solid var(--line);
-    margin-top: 10px;
-  }
-  .btn-ghost:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
-  .btn-ghost:disabled { opacity: .35; cursor: not-allowed; }
-
-  .msg { margin: 14px 26px 0; font-size: 13px; min-height: 18px; }
-  .msg.err { color: #ff9b8e; }
-  .msg.ok  { color: var(--green); }
-
-  /* ----- Stats ----- */
-  .stats { padding: 8px 26px 26px; margin-top: auto; }
-  .stats-head { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--fog); font-weight: 600; margin: 18px 0 12px; }
-  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  .stat { background: var(--panel); padding: 13px 14px; }
-  .stat .v { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
-  .stat .l { font-size: 11px; color: var(--fog); margin-top: 3px; }
-  .reroute { margin-top: 12px; font-size: 12.5px; color: var(--amber); display: none; gap: 7px; align-items: flex-start; }
-  .reroute.show { display: flex; }
-
-  .legend { display: flex; gap: 16px; margin-top: 16px; font-size: 12px; color: var(--fog); }
-  .legend span { display: flex; align-items: center; gap: 6px; }
-  .dot { width: 11px; height: 11px; border-radius: 3px; }
-
-  /* ----- Map ----- */
-  .map-wrap { flex: 1; position: relative; }
-  #map { width: 100%; height: 100vh; background: #0a0f0d; }
+  /* ---------- Map ---------- */
+  #map { flex:1; height:100vh; background:#0a0f0d; z-index:0; }
+  .leaflet-container { font-family:'Outfit',sans-serif; }
   .placeholder {
-    position: absolute; inset: 0; display: grid; place-items: center;
-    pointer-events: none; text-align: center; color: var(--fog);
+    position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+    text-align:center; color:var(--fog); z-index:1;
   }
-  .placeholder .big { font-size: 19px; color: var(--paper); margin-bottom: 6px; font-weight: 500; }
-  .leaflet-container { font-family: 'Outfit', sans-serif; }
+  .placeholder .big { font-size:18px; color:var(--paper); margin-bottom:6px; font-weight:500; }
 
-  .spinner {
-    width: 17px; height: 17px; border: 2.5px solid rgba(26,18,8,.25);
-    border-top-color: #1a1208; border-radius: 50%; display: inline-block;
-    vertical-align: -3px; margin-right: 8px; animation: spin .7s linear infinite;
+  /* ---------- Panel ---------- */
+  .panel {
+    width:380px; min-width:380px; height:100vh; overflow-y:auto;
+    background:radial-gradient(120% 60% at -10% 0%, rgba(232,163,61,.07), transparent 60%), var(--ink-2);
+    border-right:1px solid var(--line); display:flex; flex-direction:column;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .handle { display:none; }
 
-  @media (max-width: 820px) {
-    body { flex-direction: column; overflow: auto; }
-    .sidebar { width: 100%; min-width: 0; height: auto; }
-    #map { height: 60vh; }
-    .map-wrap { min-height: 60vh; }
+  .brand { padding:24px 24px 16px; position:relative; }
+  .brand h1 { font-size:26px; font-weight:700; letter-spacing:-.5px; margin:0; display:flex; align-items:center; gap:11px; }
+  .brand h1 .mark { width:30px; height:30px; flex:none; border:2px solid var(--amber); border-radius:8px;
+    display:grid; place-items:center; color:var(--amber); font-size:16px; transform:rotate(-6deg); }
+  .brand p { margin:7px 0 0; color:var(--fog); font-size:13px; font-weight:300; }
+  .result { margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--amber); min-height:16px; }
+
+  .form { padding:6px 24px 4px; }
+  .field { margin-bottom:16px; }
+  label { display:block; font-size:11.5px; letter-spacing:1.1px; text-transform:uppercase; color:var(--fog); margin-bottom:7px; font-weight:600; }
+  input[type=text], select {
+    width:100%; padding:12px 13px; border-radius:11px; background:var(--ink); color:var(--paper);
+    border:1px solid var(--line); font-family:inherit; font-size:16px; transition:border-color .15s, box-shadow .15s;
   }
+  input[type=text]:focus, select:focus { outline:none; border-color:var(--amber); box-shadow:0 0 0 3px rgba(232,163,61,.15); }
+  select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238aa298' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center; }
+
+  .row-between { display:flex; align-items:baseline; justify-content:space-between; }
+  .val { font-family:'JetBrains Mono',monospace; color:var(--amber); font-weight:700; font-size:14px; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; margin-top:12px; border-radius:6px; cursor:pointer;
+  }
+  #grad { background:linear-gradient(90deg, var(--green), var(--orange), var(--red)); }
+  #calm { background:linear-gradient(90deg, var(--fog), var(--green)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--paper); border:3px solid var(--amber-deep); box-shadow:0 2px 6px rgba(0,0,0,.4); }
+  input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:var(--paper);
+    border:3px solid var(--amber-deep); box-shadow:0 2px 6px rgba(0,0,0,.4); }
+  .ends { display:flex; justify-content:space-between; font-size:10.5px; color:var(--fog); margin-top:6px; letter-spacing:.5px; }
+
+  /* toggle */
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:13px 14px; border:1px solid var(--line); border-radius:11px; background:var(--ink); }
+  .toggle-row .t-label { font-size:14.5px; font-weight:500; }
+  .toggle-row .t-sub { font-size:11.5px; color:var(--fog); margin-top:2px; }
+  .switch { position:relative; width:48px; height:28px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider-sw { position:absolute; inset:0; background:var(--line); border-radius:30px; transition:.2s; cursor:pointer; }
+  .slider-sw::before { content:""; position:absolute; height:22px; width:22px; left:3px; top:3px; background:var(--paper); border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider-sw { background:var(--amber-deep); }
+  .switch input:checked + .slider-sw::before { transform:translateX(20px); }
+
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .btn { width:100%; padding:14px; border:none; border-radius:12px; font-family:inherit; font-weight:600; font-size:15px;
+    cursor:pointer; transition:transform .08s, filter .15s; letter-spacing:.2px; }
+  .btn:active { transform:translateY(1px); }
+  .btn-primary { background:linear-gradient(135deg, var(--amber), var(--amber-deep)); color:#1a1208; }
+  .btn-primary:hover { filter:brightness(1.06); }
+  .btn-primary:disabled { opacity:.55; cursor:progress; }
+  .btn-ghost { background:transparent; color:var(--paper); border:1px solid var(--line); margin-top:10px; }
+  .btn-ghost:hover:not(:disabled) { border-color:var(--amber); color:var(--amber); }
+  .btn-ghost:disabled { opacity:.35; cursor:not-allowed; }
+
+  .msg { margin:12px 24px 0; font-size:13px; min-height:16px; }
+  .msg.err { color:#ff9b8e; } .msg.ok { color:var(--green); }
+
+  .stats { padding:6px 24px 26px; }
+  .stats-head { font-size:11.5px; letter-spacing:1.1px; text-transform:uppercase; color:var(--fog); font-weight:600; margin:16px 0 12px; }
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .stat { background:var(--panel); padding:12px 13px; }
+  .stat .v { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; }
+  .stat .l { font-size:10.5px; color:var(--fog); margin-top:3px; }
+  .reroute { margin-top:12px; font-size:12.5px; color:var(--amber); display:none; gap:7px; align-items:flex-start; }
+  .reroute.show { display:flex; }
+  .legend { display:flex; gap:14px; margin-top:14px; font-size:12px; color:var(--fog); flex-wrap:wrap; }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .dot { width:11px; height:11px; border-radius:3px; }
+  .spinner { width:16px; height:16px; border:2.5px solid rgba(26,18,8,.25); border-top-color:#1a1208;
+    border-radius:50%; display:inline-block; vertical-align:-3px; margin-right:8px; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ---------- Mobile: bottom sheet ---------- */
+  @media (max-width:820px) {
+    body { display:block; }
+    #map { position:fixed; inset:0; width:100vw; height:100vh; }
+    .placeholder { z-index:1; }
+    .panel {
+      position:fixed; left:0; right:0; bottom:0; width:100%; min-width:0; height:auto;
+      max-height:82vh; border-right:none; border-top:1px solid var(--line);
+      border-radius:20px 20px 0 0; z-index:1000; box-shadow:0 -12px 40px rgba(0,0,0,.5);
+      transform:translateY(calc(100% - 116px)); transition:transform .3s cubic-bezier(.4,0,.2,1);
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    .panel.open { transform:translateY(0); }
+    .handle {
+      display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 0 4px; cursor:pointer; position:relative;
+    }
+    .handle .grab { width:42px; height:5px; border-radius:3px; background:var(--line); }
+    .handle .hint { font-size:11px; color:var(--fog); letter-spacing:.5px; }
+    .brand { padding:4px 22px 12px; }
+    .brand h1 { font-size:22px; }
+    .brand p { display:none; }
+    .panel.open .brand p { display:block; }
+  }
+  @media (max-width:380px) { .stat .v { font-size:16px; } }
 </style>
 </head>
 <body>
-  <aside class="sidebar">
+  <div id="map"></div>
+  <div class="placeholder" id="placeholder">
+    <div><div class="big">Plan a ride to see it here</div><div>Routes are coloured by gradient.</div></div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="handle" id="handle">
+      <div class="grab"></div>
+      <div class="hint" id="handleHint">Tap to plan a route</div>
+    </div>
+
     <div class="brand">
       <h1><span class="mark">▲</span> Ridgeline</h1>
       <p>Quiet, paved, climb-aware road bike routing.</p>
+      <div class="result" id="result"></div>
     </div>
 
     <div class="form">
@@ -189,30 +168,33 @@
       </div>
 
       <div class="field">
-        <div class="grad-row">
-          <label for="grad" style="margin:0">Max gradient</label>
-          <span class="grad-val" id="gradVal">8%</span>
-        </div>
+        <div class="row-between"><label for="grad" style="margin:0">Max gradient (enforced)</label><span class="val" id="gradVal">8%</span></div>
         <input type="range" id="grad" min="1" max="15" value="8" step="1" />
       </div>
 
-      <div class="two">
-        <div class="field" style="margin-bottom:18px">
-          <label for="traffic">Preferred traffic</label>
-          <select id="traffic">
-            <option value="low" selected>Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
+      <div class="field">
+        <div class="row-between"><label for="calm" style="margin:0">Avoid busy roads</label><span class="val" id="calmVal">70</span></div>
+        <input type="range" id="calm" min="0" max="100" value="70" step="5" />
+        <div class="ends"><span>DIRECT</span><span>CALMEST</span></div>
+      </div>
+
+      <div class="field">
+        <div class="toggle-row">
+          <div>
+            <div class="t-label">Avoid main roads</div>
+            <div class="t-sub">No motorways; shun primary/secondary</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="avoidMain" checked /><span class="slider-sw"></span></label>
         </div>
-        <div class="field" style="margin-bottom:18px">
-          <label for="surface">Surface</label>
-          <select id="surface">
-            <option value="asphalt">Asphalt</option>
-            <option value="paved" selected>Paved</option>
-            <option value="any">Any</option>
-          </select>
-        </div>
+      </div>
+
+      <div class="field">
+        <label for="surface">Surface</label>
+        <select id="surface">
+          <option value="asphalt">Asphalt only</option>
+          <option value="paved" selected>Paved</option>
+          <option value="any">Any</option>
+        </select>
       </div>
 
       <button class="btn btn-primary" id="planBtn">Plan route</button>
@@ -225,15 +207,13 @@
       <div class="stats-head">Route summary</div>
       <div class="stat-grid">
         <div class="stat"><div class="v" id="sDist">–</div><div class="l">Distance</div></div>
-        <div class="stat"><div class="v" id="sGain">–</div><div class="l">Elevation gain</div></div>
+        <div class="stat"><div class="v" id="sGain">–</div><div class="l">Climb</div></div>
+        <div class="stat"><div class="v" id="sTime">–</div><div class="l">@ 20 km/h</div></div>
         <div class="stat"><div class="v" id="sPaved">–</div><div class="l">Paved</div></div>
-        <div class="stat"><div class="v" id="sAvg">–</div><div class="l">Avg gradient</div></div>
-        <div class="stat"><div class="v" id="sTime">–</div><div class="l">Time @ 20 km/h</div></div>
+        <div class="stat"><div class="v" id="sBusy">–</div><div class="l">Busy roads</div></div>
         <div class="stat"><div class="v" id="sMax">–</div><div class="l">Steepest</div></div>
       </div>
-      <div class="reroute" id="reroute">
-        <span>⤳</span><span>Too much of the direct route was too steep — re-routed to flatten the climb.</span>
-      </div>
+      <div class="reroute" id="reroute"><span>⤳</span><span>Too much exceeded your gradient — re-routed to flatten it.</span></div>
       <div class="legend">
         <span><i class="dot" style="background:var(--green)"></i> ≤3%</span>
         <span><i class="dot" style="background:var(--orange)"></i> 3–7%</span>
@@ -242,144 +222,101 @@
     </div>
   </aside>
 
-  <div class="map-wrap">
-    <div id="map"></div>
-    <div class="placeholder" id="placeholder">
-      <div>
-        <div class="big">Plan a ride to see it here</div>
-        <div>Routes are coloured by gradient.</div>
-      </div>
-    </div>
-  </div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
   const $ = (id) => document.getElementById(id);
-  let lastRoute = null;          // for GPX export
-  let routeLayer = null, markerLayer = null;
+  const isMobile = () => window.matchMedia('(max-width:820px)').matches;
+  let lastRoute = null, routeLayer = null, markerLayer = null;
 
-  const map = L.map('map', { zoomControl: true }).setView([46.85, 9.53], 9);
+  const map = L.map('map', { zoomControl:true }).setView([46.78, 9.55], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
+    maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  $('grad').addEventListener('input', (e) => $('gradVal').textContent = e.target.value + '%');
+  // Bottom-sheet toggle (mobile)
+  const panel = $('panel');
+  if (isMobile()) panel.classList.add('open');
+  $('handle').addEventListener('click', () => panel.classList.toggle('open'));
 
-  function setMsg(text, kind) {
-    const m = $('msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : '');
-  }
+  $('grad').addEventListener('input', e => $('gradVal').textContent = e.target.value + '%');
+  $('calm').addEventListener('input', e => $('calmVal').textContent = e.target.value);
 
-  function fmtTime(min) {
-    const h = Math.floor(min / 60), m = Math.round(min % 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  }
+  function setMsg(t, k) { const m=$('msg'); m.textContent=t||''; m.className='msg'+(k?' '+k:''); }
+  function fmtTime(min){ const h=Math.floor(min/60), m=Math.round(min%60); return h>0?`${h}h ${m}m`:`${m}m`; }
 
   async function planRoute() {
     const btn = $('planBtn');
     const payload = {
-      start: $('start').value.trim(),
-      end: $('end').value.trim(),
-      max_gradient: parseInt($('grad').value, 10),
-      traffic: $('traffic').value,
-      surface: $('surface').value,
+      start:$('start').value.trim(), end:$('end').value.trim(),
+      max_gradient:parseInt($('grad').value,10),
+      road_calm:parseInt($('calm').value,10),
+      avoid_main_roads:$('avoidMain').checked,
+      surface:$('surface').value,
     };
-    if (!payload.start || !payload.end) { setMsg('Enter both a start and a destination.', 'err'); return; }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Routing…';
-    setMsg('Geocoding, routing and reading elevation…');
-
+    if (!payload.start || !payload.end) { setMsg('Enter both a start and a destination.','err'); return; }
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Routing…';
+    setMsg('Geocoding, building a custom profile and routing…');
     try {
-      const res = await fetch('/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch('/plan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Routing failed.');
-      lastRoute = data;
-      renderRoute(data);
-      setMsg(`${data.start.name.split(',')[0]} → ${data.end.name.split(',')[0]}`, 'ok');
-      $('gpxBtn').disabled = false;
-    } catch (err) {
-      setMsg(err.message, 'err');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Plan route';
-    }
+      lastRoute = data; renderRoute(data);
+      setMsg(`${data.start.name.split(',')[0]} → ${data.end.name.split(',')[0]}`,'ok');
+      $('gpxBtn').disabled=false;
+      if (isMobile()) panel.classList.remove('open');   // reveal the map
+    } catch(err) { setMsg(err.message,'err'); }
+    finally { btn.disabled=false; btn.textContent='Plan route'; }
   }
 
   function renderRoute(data) {
-    $('placeholder').style.display = 'none';
+    $('placeholder').style.display='none';
     if (routeLayer) map.removeLayer(routeLayer);
     if (markerLayer) map.removeLayer(markerLayer);
-
-    routeLayer = L.geoJSON(data.geojson, {
-      style: (f) => ({ color: f.properties.color, weight: 5, opacity: 0.95, lineCap: 'round' }),
-    }).addTo(map);
-
-    const sIcon = (color, label) => L.divIcon({
-      className: '',
-      html: `<div style="background:${color};color:#1a1208;width:26px;height:26px;border-radius:50% 50% 50% 0;
-             transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;
-             box-shadow:0 2px 8px rgba(0,0,0,.5)"><span style="transform:rotate(45deg);font-weight:700;font-size:12px">${label}</span></div>`,
-      iconSize: [26, 26], iconAnchor: [13, 26],
-    });
+    routeLayer = L.geoJSON(data.geojson, { style:f=>({ color:f.properties.color, weight:5, opacity:.95, lineCap:'round' }) }).addTo(map);
+    const pin=(c,l)=>L.divIcon({ className:'', html:`<div style="background:${c};color:#1a1208;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)"><span style="transform:rotate(45deg);font-weight:700;font-size:12px">${l}</span></div>`, iconSize:[26,26], iconAnchor:[13,26] });
     markerLayer = L.layerGroup([
-      L.marker([data.start.lat, data.start.lon], { icon: sIcon('#e8a33d', 'A') }),
-      L.marker([data.end.lat, data.end.lon], { icon: sIcon('#eef4ef', 'B') }),
+      L.marker([data.start.lat,data.start.lon],{icon:pin('#e8a33d','A')}),
+      L.marker([data.end.lat,data.end.lon],{icon:pin('#eef4ef','B')}),
     ]).addTo(map);
+    map.fitBounds(routeLayer.getBounds(), { padding:[50,50] });
 
-    map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
-
-    const s = data.stats;
-    $('sDist').textContent = s.distance_km + ' km';
-    $('sGain').textContent = s.elevation_gain_m + ' m';
-    $('sPaved').textContent = s.percent_paved + '%';
-    $('sAvg').textContent = s.avg_gradient + '%';
-    $('sTime').textContent = fmtTime(s.ride_time_min);
-    $('sMax').textContent = s.max_gradient_seen + '%';
-    $('reroute').className = 'reroute' + (s.rerouted ? ' show' : '');
+    const s=data.stats;
+    $('sDist').textContent=s.distance_km+' km';
+    $('sGain').textContent=s.elevation_gain_m+' m';
+    $('sTime').textContent=fmtTime(s.ride_time_min);
+    $('sPaved').textContent=s.percent_paved+'%';
+    $('sBusy').textContent=s.busy_road_percent+'%';
+    $('sMax').textContent=s.max_gradient_seen+'%';
+    $('reroute').className='reroute'+(s.rerouted?' show':'');
+    $('result').textContent=`${s.distance_km} km · ${s.elevation_gain_m} m ↑ · ${fmtTime(s.ride_time_min)}`;
+    $('handleHint').textContent=`${s.distance_km} km · ${s.elevation_gain_m} m ↑ — tap for details`;
   }
 
-  // ----- GPX export (client-side, includes elevation) -----
-  function buildGPX(data) {
-    const name = `${data.start.name.split(',')[0]} to ${data.end.name.split(',')[0]}`;
-    const esc = (t) => String(t).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-    const pts = data.track.map(
-      (p) => `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><ele>${(p.ele || 0).toFixed(1)}</ele></trkpt>`
-    ).join('\n');
+  // ---- GPX export (client-side, with elevation) ----
+  function buildGPX(d) {
+    const name=`${d.start.name.split(',')[0]} to ${d.end.name.split(',')[0]}`;
+    const esc=t=>String(t).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    const pts=d.track.map(p=>`      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><ele>${(p.ele||0).toFixed(1)}</ele></trkpt>`).join('\n');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Ridgeline Route Planner" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${esc(name)}</name></metadata>
-  <trk>
-    <name>${esc(name)}</name>
-    <trkseg>
+  <trk><name>${esc(name)}</name><trkseg>
 ${pts}
-    </trkseg>
-  </trk>
+  </trkseg></trk>
 </gpx>`;
   }
-
-  function exportGPX() {
-    if (!lastRoute) return;
-    const blob = new Blob([buildGPX(lastRoute)], { type: 'application/gpx+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const slug = (lastRoute.start.name.split(',')[0] + '-' + lastRoute.end.name.split(',')[0])
-      .toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    a.href = url; a.download = `${slug || 'route'}.gpx`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+  function exportGPX(){
+    if(!lastRoute) return;
+    const blob=new Blob([buildGPX(lastRoute)],{type:'application/gpx+xml'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    const slug=(lastRoute.start.name.split(',')[0]+'-'+lastRoute.end.name.split(',')[0]).toLowerCase().replace(/[^a-z0-9]+/g,'-');
+    a.href=url; a.download=`${slug||'route'}.gpx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
 
   $('planBtn').addEventListener('click', planRoute);
   $('gpxBtn').addEventListener('click', exportGPX);
-  [$('start'), $('end')].forEach((el) =>
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') planRoute(); })
-  );
+  [$('start'),$('end')].forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter') planRoute(); }));
 </script>
 </body>
 </html>
